@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from amaranth         import Elaboratable, Module, Signal, Array, Cat
+from amaranth         import Elaboratable, Module, Signal, Array, Cat, Mux
 from amaranth.hdl.ast import Fell
 from amaranth.hdl     import ir
 from amaranth.back import verilog, rtlil
@@ -33,23 +33,26 @@ class TimesTable(Elaboratable):
         print(f"using serial divisor: {divisor} with baudrate {clk_freq // divisor}")
         m.submodules.serial = serial = AsyncSerialTX(divisor=divisor)
 
-        m.submodules.mult = mult = Multiplier(bitwidth=16)
+        m.submodules.mult = mult = Multiplier(bitwidth=96)
 
         a = Signal.like(mult.factor_a)
         b = Signal.like(mult.factor_b)
         r = Signal.like(mult.result)
 
         m.d.comb += [
-            mult.factor_a.eq(a),
-            mult.factor_b.eq(b),
-            r.eq(mult.result),
+            mult.factor_a.eq(a << 40),
+            mult.factor_b.eq(b << 40),
+            r.eq(mult.result >> 80),
             self.tx.eq(serial.o),
         ]
 
-        max_n = 128
+        max_n = 512
         with m.If(serial.rdy):
             m.d.comb += [
-                serial.data.eq(r),
+                serial.data.eq(
+                    Mux(r <= 0xff,     r,
+                    Mux(r <= 0xffff,   r[8:],
+                    Mux(r <= 0xffffff, r[16:], r)))),
                 serial.ack.eq(1),
             ]
             m.d.sync += a.eq(a + 1)

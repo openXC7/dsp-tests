@@ -1,4 +1,4 @@
-PREFIX ?= /snap/nextpnr-kintex/current
+PREFIX ?= /snap/openxc7/current
 DB_DIR=${PREFIX}/opt/nextpnr-xilinx/external/prjxray-db
 CHIPDB=../chipdb
 PROJECT=mult_harness
@@ -22,7 +22,7 @@ ${CHIPDB}/${PART}.bin:
 	rm -f ${PART}.bba
 
 ${PROJECT}.fasm: ${PROJECT}.json ${CHIPDB}/${PART}.bin ${PROJECT}.xdc
-	nextpnr-xilinx --chipdb ${CHIPDB}/${PART}.bin --xdc ${PROJECT}.xdc --json ${PROJECT}.json --fasm $@ --freq 100 --verbose --debug --router router1
+	nextpnr-xilinx --chipdb ${CHIPDB}/${PART}.bin --xdc ${PROJECT}.xdc --json ${PROJECT}.json --fasm $@ --freq 100 # --verbose --debug --router router1
 
 ${PROJECT}.frames: ${PROJECT}.fasm
 	fasm2frames --part ${PART} --db-root ${DB_DIR}/kintex7 $< | tee $@ > /dev/null
@@ -35,6 +35,10 @@ program: ${PROJECT}.bit
 
 run:
 	./serial-dump.py
+
+show: ${PROJECT}.json
+	yosys -p "read_json ${PROJECT}.json; cd mult; show"
+	dotty  ~/.yosys_show.dot
 
 .PHONY: clean
 clean:
